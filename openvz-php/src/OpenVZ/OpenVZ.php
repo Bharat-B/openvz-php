@@ -200,7 +200,7 @@ class OpenVZ {
      * @param $ctid
      * @return mixed
      */
-    public static function vdisable_tuntap($ctid){
+    public static function disable_tuntap($ctid){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl set {$ctid} --devnodes net/tun:none --save
                 /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --devices c:10:200:none --save
                 /usr/bin/sudo /usr/sbin/vzctl stop {$ctid}
