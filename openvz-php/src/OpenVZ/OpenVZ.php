@@ -1,11 +1,22 @@
 <?php
-
+/**
+ * Distributed under MIT License,
+ * PHP Class for management of OpenVZ Containers.
+ * @author Bharat B <bbharat95@gmail.com>
+ */
 namespace OpenVZ;
 
 class OpenVZ {
 
+    /**
+     * @var
+     */
     protected static $ssh;
 
+    /**
+     * @param $connection
+     * @throws Exception
+     */
     public function __construct($connection){
         if(!$connection->exec('uptime')) {
             throw new Exception('SSH connection not provided');
@@ -13,6 +24,10 @@ class OpenVZ {
         self::$ssh = $connection;
     }
 
+    /**
+     * @param object $params
+     * @return mixed
+     */
     public static function create($params){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl create {$params->ctid} --ostemplate {$params->template} --config basic --hostname {$params->hostname}
             /usr/bin/sudo /usr/sbin/vzctl set {$params->ctid} --diskspace {$params->disk}g:{$params->disk}g --save
@@ -30,18 +45,29 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function destroy($ctid){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl stop {$ctid}
             /usr/bin/sudo /usr/sbin/vzctl destroy {$ctid}";
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param object $params
+     */
     public static function rebuild($params){
         if(self::vdestroy($params->ctid)){
             self::vcreate($params);
         }
     }
 
+    /**
+     * @param object $params
+     * @return string
+     */
     public static function resize($params){
         $vdisk = self::$ssh->exec("/usr/sbin/vzlist {$params->ctid} -Ho diskspace");
         if(($params->disk*1024*1024) > $vdisk){
@@ -55,6 +81,10 @@ class OpenVZ {
         return "New disk size cannot be less than current disk size!";
     }
 
+    /**
+     * @param object $params
+     * @return mixed
+     */
     public static function addip($params){
         if(isset($params->ips) && count($params->ips) > 1) {
             $commands = "";
@@ -67,6 +97,10 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param object $params
+     * @return mixed
+     */
     public static function delip($params){
         if(isset($params->ips) && count($params->ips) > 1) {
             $commands = "";
@@ -79,38 +113,78 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function start($ctid){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl start {$ctid}");
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function stop($ctid){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl stop {$ctid}");
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function vrestart($ctid){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl restart {$ctid}");
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function suspend($ctid){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl set {$ctid} --disabled yes --save; /usr/bin/sudo /usr/sbin/vzctl stop {$ctid}");
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function unsuspend($ctid){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl set {$ctid} --disabled no --save; /usr/bin/sudo /usr/sbin/vzctl start {$ctid}");
     }
 
+    /**
+     * @param $ctid
+     * @param $password
+     * @return mixed
+     */
     public static function set_password($ctid,$password){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl start {$ctid}; /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --userpasswd root:{$password} --save");
     }
 
+    /**
+     * @param $ctid
+     * @param $hostname
+     * @return mixed
+     */
     public static function set_hostname($ctid,$hostname){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl start {$ctid}; /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --hostname {$hostname} --save");
     }
 
+    /**
+     * @param $ctid
+     * @param $dns1
+     * @param $dns2
+     * @return mixed
+     */
     public static function set_dns($ctid,$dns1,$dns2){
         return self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl set $ctid --nameserver {$dns1}  --nameserver {$dns2} --save;");
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function enable_tuntap($ctid){
         $commands = "modprobe tun; /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --devnodes net/tun:rw --save
                 /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --devices c:10:200:rw --save
@@ -122,6 +196,10 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function vdisable_tuntap($ctid){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl set {$ctid} --devnodes net/tun:none --save
                 /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --devices c:10:200:none --save
@@ -131,6 +209,10 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function enable_ppp($ctid){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl stop {$ctid}
                 /usr/bin/sudo /usr/sbin/vzctl set {$ctid} --features ppp:on --save
@@ -138,6 +220,10 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function vdisable_ppp($ctid){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl set {$ctid} --features ppp:off --save;
                 /usr/bin/sudo /usr/sbin/vzctl stop {$ctid};
@@ -146,6 +232,10 @@ class OpenVZ {
         return self::$ssh->exec($commands);
     }
 
+    /**
+     * @param $ctid
+     * @return bool
+     */
     public static function tuntap_status($ctid){
         if(strlen(self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl exec {$ctid} cat /dev/net/tun")) == 48){
             return true;
@@ -153,6 +243,10 @@ class OpenVZ {
         return false;
     }
 
+    /**
+     * @param $ctid
+     * @return bool
+     */
     public static function ppp_status($ctid){
         if(strlen(self::$ssh->exec("/usr/bin/sudo /usr/sbin/vzctl exec {$ctid} cat /dev/ppp")) == 41){
             return true;
@@ -160,6 +254,10 @@ class OpenVZ {
         return false;
     }
 
+    /**
+     * @param $ctid
+     * @return mixed
+     */
     public static function status($ctid){
         return self::$ssh->exec("/usr/sbin/vzlist {$ctid} -Ho status");
     }
