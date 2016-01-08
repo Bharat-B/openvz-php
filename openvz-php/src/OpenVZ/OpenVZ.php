@@ -224,7 +224,7 @@ class OpenVZ {
      * @param $ctid
      * @return mixed
      */
-    public static function vdisable_ppp($ctid){
+    public static function disable_ppp($ctid){
         $commands = "/usr/bin/sudo /usr/sbin/vzctl set {$ctid} --features ppp:off --save;
                 /usr/bin/sudo /usr/sbin/vzctl stop {$ctid};
                 /usr/bin/sudo /usr/sbin/vzctl start {$ctid};
@@ -260,5 +260,67 @@ class OpenVZ {
      */
     public static function status($ctid){
         return self::$ssh->exec("/usr/sbin/vzlist {$ctid} -Ho status");
+    }
+
+    public static function tc_create($params){
+        if(count($params->ips) > 1){
+            foreach($params->ips as $ip) {
+                switch(self::ip_check($ip)){
+                    case 'v4':
+                        $fi = "/sbin/tc filter add dev venet0 protocol ip parent 1:0 prio {$params->ctid} u32 match ip dst {$params->ip} flowid 1:{$params->bwin};";
+                        $fo = "/sbin/tc filter add dev {$params->interface} protocol ip parent 1:0 prio {$params->ctid} u32 match ip dst {$params->ip} flowid 1:{$params->bwout};";
+                        break;
+                    case 'v6':
+                        $fi = "/sbin/tc filter add dev venet0 protocol ipv6 parent 1:0 prio {$params->ctid} u32 match ipv6 dst {$params->ip} flowid 1:{$params->bwin};";
+                        $fo = "/sbin/tc filter add dev {$params->interface} protocol ipv6 parent 1:0 prio {$params->ctid} u32 match ip6 dst {$params->ip} flowid 1:{$params->bwout};";
+                        break;
+                }
+                $commands = "/sbin/tc qdisc add dev venet0 root handle 1: htb;
+                    /sbin/tc class add dev venet0 parent 1: classid 1:{$params->bwin} htb rate {$params->bwin}mbit;
+                    /sbin/tc qdisc add dev venet0 parent 1:{$params->bwin} handle {$params->bwin}: sfq perturb 10;
+                    {$fi}
+                    /sbin/tc qdisc add dev {$params->interface} root handle 1: htb;
+                    /sbin/tc class add dev {$params->interface} parent 1: classid 1:{$params->bwout} htb rate {$params->bwout}mbit;
+                    /sbin/tc qdisc add dev {$params->interface} parent 1:{$params->bwout} handle {$params->bwout}: sfq perturb 10;
+                    {$fo}";
+            }
+        } else {
+            switch(self::ip_check($params->ip)){
+                case 'v4':
+                    $fi = "/sbin/tc filter add dev venet0 protocol ip parent 1:0 prio {$params->ctid} u32 match ip dst {$params->ip} flowid 1:{$params->bwin}";
+                    $fo = "/sbin/tc filter add dev {$params->interface} protocol ip parent 1:0 prio {$params->ctid} u32 match ip dst {$params->ip} flowid 1:{$params->bwout}";
+                    break;
+                case 'v6':
+                    $fi = "/sbin/tc filter add dev venet0 protocol ipv6 parent 1:0 prio {$params->ctid} u32 match ipv6 dst {$params->ip} flowid 1:{$params->bwin}";
+                    $fo = "/sbin/tc filter add dev {$params->interface} protocol ipv6 parent 1:0 prio {$params->ctid} u32 match ip6 dst {$params->ip} flowid 1:{$params->bwout}";
+                    break;
+            }
+            $commands = "/sbin/tc qdisc add dev venet0 root handle 1: htb
+                /sbin/tc class add dev venet0 parent 1: classid 1:{$params->bwin} htb rate {$params->bwin}mbit
+                /sbin/tc qdisc add dev venet0 parent 1:{$params->bwin} handle {$params->bwin}: sfq perturb 10
+                {$fi}
+                /sbin/tc qdisc add dev {$params->interface} root handle 1: htb
+                /sbin/tc class add dev {$params->interface} parent 1: classid 1:{$params->bwout} htb rate {$params->bwout}mbit
+                /sbin/tc qdisc add dev {$params->interface} parent 1:{$params->bwout} handle {$params->bwout}: sfq perturb 10
+                {$fo}";
+        }
+        return self::$ssh->exec($commands);
+    }
+
+    public static function tc_destroy($params){
+        $commands = "/sbin/tc filter del dev venet0 prio {$params->ctid}
+                /sbin/tc filter del dev {$params->interface} prio {$params->ctid}";
+        return self::$ssh->exec($commands);
+    }
+
+    public static function ip_check($ip){
+        if(filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)){
+            $result = 'v4';
+        } elseif(filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6)){
+            $result = 'v6';
+        } else {
+            $result = 'error';
+        }
+        return $result;
     }
 }
